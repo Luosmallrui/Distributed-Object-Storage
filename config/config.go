@@ -2,13 +2,26 @@ package config
 
 import (
 	"fmt"
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v3"
 	"os"
 )
 
+var (
+	ConfigDetail *Config
+)
+
 type Config struct {
 	OssConfig OssConfig `yaml:"oss_config" json:"oss_config"`
+}
+
+func (c *OssConfig) NewOssClient() (*oss.Client, error) {
+	client, err := oss.New(c.Endpoint, c.AK, c.SK)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OSS client: %v", err)
+	}
+	return client, nil
 }
 
 type OssConfig struct {
@@ -22,12 +35,11 @@ func InitConfig(cli *cli.Context) *Config {
 	//profile := cli.String("profile")
 
 	p := fmt.Sprintf("./config/config-dev.yaml")
-	fmt.Println(p, 11)
-
 	c, err := NewByFile(p)
 	if err != nil {
 		panic(err)
 	}
+	ConfigDetail = c
 	return c
 }
 
