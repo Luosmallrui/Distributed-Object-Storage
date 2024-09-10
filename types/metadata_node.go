@@ -35,3 +35,8 @@ type CompletedPart struct {
 	PartNumber int    //分⽚的编号
 	ETag       string //分片的Etag
 }
+
+type GetObjectMetadataReq struct {
+	BucketName string
+	ObjectName string
+}
