@@ -52,8 +52,10 @@ func main() {
 func initApp(app *Commands) {
 	dos := dao.Init()
 	metaDataController := controller.NewMetadataNodeController(dos)
+	storageController := controller.NewStorageNodeController(dos)
 	//if err := redis.Init(); err != nil {
 	//	logs.Logger.Errorf("Redis can not init %v", err)
 	//}
 	metaDataController.RegisterRouter(app.server)
+	storageController.RegisterRouter(app.server)
 }
