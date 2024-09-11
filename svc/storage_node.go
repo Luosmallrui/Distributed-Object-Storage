@@ -4,6 +4,7 @@ import (
 	"context"
 	"distributed-object-storage/config"
 	"distributed-object-storage/pkg/db/dao"
+	"distributed-object-storage/types"
 	"errors"
 	"fmt"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -11,10 +12,12 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type StorageNode interface {
 	PutObject(ctx context.Context, bucketName, objectName string, data io.Reader, size int64, metadata map[string]string) (string, error)
+	GetObject(ctx context.Context, bucketName, objectName string) (io.ReadCloser, types.ObjectInfo, error)
 }
 
 type StorageNodeSvc struct {
@@ -139,4 +142,42 @@ func SplitFileByPartSize(fileSize int64, chunkSize int64) ([]oss.FileChunk, erro
 	}
 
 	return chunks, nil
+}
+
+func (s *StorageNodeSvc) GetObject(ctx context.Context, bucketName, objectName string) (io.ReadCloser, types.ObjectInfo, error) {
+	client, err := config.ConfigDetail.OssConfig.NewOssClient()
+	ObjectInfo := types.ObjectInfo{}
+	if err != nil {
+		return nil, types.ObjectInfo{}, err
+	}
+	// 获取 Bucket
+	bucket, err := client.Bucket(bucketName)
+	if err != nil {
+		return nil, ObjectInfo, err
+	}
+
+	// 获取对象
+	object, err := bucket.GetObject(objectName)
+	if err != nil {
+		return nil, ObjectInfo, err
+	}
+
+	// 获取对象元数据
+	var size int64
+	var LastModified time.Time
+	headers, _ := bucket.GetObjectMeta(objectName)
+	if contentLengthStr := headers.Get("Content-Length"); contentLengthStr != "" {
+		size, err = strconv.ParseInt(contentLengthStr, 10, 64)
+	}
+	if lastModifiedStr := headers.Get("Last-Modified"); lastModifiedStr != "" {
+		LastModified, err = time.Parse(time.RFC1123, lastModifiedStr)
+	}
+	objectInfo := types.ObjectInfo{
+		Name:         objectName,
+		Size:         size,
+		ETag:         strings.Trim(headers.Get("ETag"), "\""),
+		LastModified: LastModified,
+	}
+
+	return object, objectInfo, nil
 }

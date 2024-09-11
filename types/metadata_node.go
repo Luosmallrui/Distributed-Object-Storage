@@ -1,6 +1,7 @@
 package types
 
 import (
+	"io"
 	"time"
 )
 
@@ -59,4 +60,10 @@ type ListBucketReq struct {
 
 type CreateBucketReq struct {
 	BucketName string `json:"bucket_name" form:"bucket_name" `
+}
+
+type GetObjectReq struct {
+	BucketName string        `json:"bucket_name" form:"bucket_name" `
+	FileReader io.ReadCloser `json:"file_reader" form:"file_reader" `
+	ObjectInfo ObjectInfo    `json:"object_info" form:"object_info" `
 }
