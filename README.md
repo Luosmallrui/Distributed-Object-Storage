@@ -204,3 +204,19 @@
 ### 11.15 前端（如果使用Go来服务前端资源）
 - **html/template**: Go标准库用于HTML模板渲染。
 - 考虑使用 **embed** 包嵌入静态资源。
+
+```mermaid
+---
+title: Example Git diagram
+---
+gitGraph
+   commit
+   commit
+   branch develop
+   checkout develop
+   commit
+   commit
+   checkout main
+   merge develop
+   commit
+   commit
