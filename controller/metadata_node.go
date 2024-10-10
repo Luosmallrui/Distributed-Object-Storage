@@ -43,6 +43,18 @@ func (ctrl *MetadataNodeController) GetObjectMetadata(ctx *gin.Context) (interfa
 	return ctrl.MetadataNodeSvc.GetObjectMetadata(ctx, options.BucketName, options.ObjectName)
 }
 
+// ListObjectMetadata 获取对象元数据列表
+// @Summary 获取对象元数据列表
+// @Description 根据 bucket_name、prefix 和 max_keys 查询对象元数据
+// @Tags metadata
+// @Accept json
+// @Produce json
+// @Param bucket_name query string true "Bucket Name"
+// @Param prefix query string false "Prefix"
+// @Param max_keys query int false "Maximum number of keys to return"
+// @Success 200 {array} types.ObjectInfo
+// @Failure 400
+// @Router /metadata/object/list [get]
 func (ctrl *MetadataNodeController) ListObjectMetadata(ctx *gin.Context) (interface{}, error) {
 	options := types.ListObjectMetadataReq{}
 	if err := ctx.ShouldBindQuery(&options); err != nil {
@@ -54,6 +66,17 @@ func (ctrl *MetadataNodeController) ListObjectMetadata(ctx *gin.Context) (interf
 	return ctrl.MetadataNodeSvc.ListObjects(ctx, options.BucketName, options.Prefix, options.MaxKeys)
 }
 
+// ListBucket 获取Bucket列表
+// @Summary 获取Bucket列表
+// @Description 根据 prefix 和 max_keys 查询Bucket
+// @Tags metadata
+// @Accept json
+// @Produce json
+// @Param prefix query string false "Prefix"
+// @Param max_keys query int false "Maximum number of keys to return"
+// @Success 200 {array} types.BucketInfo
+// @Failure 400
+// @Router /metadata/bucket/list [get]
 func (ctrl *MetadataNodeController) ListBucket(ctx *gin.Context) (interface{}, error) {
 	options := types.ListBucketReq{}
 	if err := ctx.ShouldBindQuery(&options); err != nil {
@@ -62,6 +85,16 @@ func (ctrl *MetadataNodeController) ListBucket(ctx *gin.Context) (interface{}, e
 	return ctrl.MetadataNodeSvc.ListBuckets(ctx, options.Prefix, options.MaxKeys)
 }
 
+// CreateBucket 创建Bucket
+// @Summary 创建Bucket
+// @Description 根据 name 创建Bucket
+// @Tags metadata
+// @Accept json
+// @Produce json
+// @Param name path string true "Bucket名字"
+// @Success 200
+// @Failure 400
+// @Router /metadata/:name [POST]
 func (ctrl *MetadataNodeController) CreateBucket(ctx *gin.Context) error {
 	bucketName := ctx.Param("name")
 	if bucketName == "" {

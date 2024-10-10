@@ -1,0 +1,185 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "contact": {}
+    },
+    "paths": {
+        "/metadata/:name": {
+            "post": {
+                "description": "根据 name 创建Bucket",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metadata"
+                ],
+                "summary": "创建Bucket",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bucket名字",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            }
+        },
+        "/metadata/bucket/list": {
+            "get": {
+                "description": "根据 prefix 和 max_keys 查询Bucket",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metadata"
+                ],
+                "summary": "获取Bucket列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Prefix",
+                        "name": "prefix",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of keys to return",
+                        "name": "max_keys",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/types.BucketInfo"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            }
+        },
+        "/metadata/object/list": {
+            "get": {
+                "description": "根据 bucket_name、prefix 和 max_keys 查询对象元数据",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metadata"
+                ],
+                "summary": "获取对象元数据列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bucket Name",
+                        "name": "bucket_name",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Prefix",
+                        "name": "prefix",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of keys to return",
+                        "name": "max_keys",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/types.ObjectInfo"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "types.BucketInfo": {
+            "type": "object",
+            "properties": {
+                "creation_date": {
+                    "description": "桶的创建时间",
+                    "type": "string"
+                },
+                "location": {
+                    "description": "Bucket datacenter",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "桶的名称",
+                    "type": "string"
+                },
+                "owner": {
+                    "description": "桶的所有者",
+                    "type": "string"
+                },
+                "region": {
+                    "description": "Bucket region",
+                    "type": "string"
+                },
+                "storage_class": {
+                    "description": "Bucket storage class",
+                    "type": "string"
+                }
+            }
+        },
+        "types.ObjectInfo": {
+            "type": "object",
+            "properties": {
+                "etag": {
+                    "description": "对象的 ETag",
+                    "type": "string"
+                },
+                "last_modified": {
+                    "description": "对象最后修改时间",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "对象的名称",
+                    "type": "string"
+                },
+                "size": {
+                    "description": "对象的⼤⼩（字节）",
+                    "type": "integer"
+                }
+            }
+        }
+    }
+}

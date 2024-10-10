@@ -1,0 +1,123 @@
+definitions:
+  types.BucketInfo:
+    properties:
+      creation_date:
+        description: 桶的创建时间
+        type: string
+      location:
+        description: Bucket datacenter
+        type: string
+      name:
+        description: 桶的名称
+        type: string
+      owner:
+        description: 桶的所有者
+        type: string
+      region:
+        description: Bucket region
+        type: string
+      storage_class:
+        description: Bucket storage class
+        type: string
+    type: object
+  types.ObjectInfo:
+    properties:
+      etag:
+        description: 对象的 ETag
+        type: string
+      last_modified:
+        description: 对象最后修改时间
+        type: string
+      name:
+        description: 对象的名称
+        type: string
+      size:
+        description: 对象的⼤⼩（字节）
+        type: integer
+    type: object
+info:
+  contact: {}
+paths:
+  /metadata/:name:
+    post:
+      consumes:
+      - application/json
+      description: 根据 name 创建Bucket
+      parameters:
+      - description: Bucket名字
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+      summary: 创建Bucket
+      tags:
+      - metadata
+  /metadata/bucket/list:
+    get:
+      consumes:
+      - application/json
+      description: 根据 prefix 和 max_keys 查询Bucket
+      parameters:
+      - description: Prefix
+        in: query
+        name: prefix
+        type: string
+      - description: Maximum number of keys to return
+        in: query
+        name: max_keys
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/types.BucketInfo'
+            type: array
+        "400":
+          description: Bad Request
+      summary: 获取Bucket列表
+      tags:
+      - metadata
+  /metadata/object/list:
+    get:
+      consumes:
+      - application/json
+      description: 根据 bucket_name、prefix 和 max_keys 查询对象元数据
+      parameters:
+      - description: Bucket Name
+        in: query
+        name: bucket_name
+        required: true
+        type: string
+      - description: Prefix
+        in: query
+        name: prefix
+        type: string
+      - description: Maximum number of keys to return
+        in: query
+        name: max_keys
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/types.ObjectInfo'
+            type: array
+        "400":
+          description: Bad Request
+      summary: 获取对象元数据列表
+      tags:
+      - metadata
+swagger: "2.0"

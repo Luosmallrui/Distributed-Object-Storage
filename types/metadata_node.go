@@ -30,10 +30,10 @@ type BucketInfo struct {
 
 // ObjectInfo 定义了对象的基本信息，通常⽤于列出对象时。
 type ObjectInfo struct {
-	Name         string    //对象的名称
-	Size         int64     //对象的⼤⼩（字节）
-	ETag         string    // 对象的 ETag
-	LastModified time.Time //对象最后修改时间
+	Name         string    `json:"name"`          //对象的名称
+	Size         int64     `json:"size"`          //对象的⼤⼩（字节）
+	ETag         string    `json:"etag"`          // 对象的 ETag
+	LastModified time.Time `json:"last_modified"` //对象最后修改时间
 }
 
 // CompletedPart 定义了已完成上传的分⽚信息。
