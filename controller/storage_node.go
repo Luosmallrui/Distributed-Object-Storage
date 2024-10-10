@@ -27,6 +27,7 @@ func (ctrl *StorageNodeController) RegisterRouter(r gin.IRouter) {
 	g := r.Group("/storage") // middwares.AuthMiddleware()
 	g.POST("/", service.DataHandlerWrapper(ctrl.PutObject))
 	g.GET("/", service.DataHandlerWrapper(ctrl.GetObject))
+	g.DELETE("/", service.NoDataHandlerWrapper(ctrl.DeleteObject))
 }
 
 func (ctrl *StorageNodeController) PutObject(ctx *gin.Context) (interface{}, error) {
@@ -54,4 +55,12 @@ func (ctrl *StorageNodeController) GetObject(ctx *gin.Context) (interface{}, err
 	res.ObjectInfo = objectInfo
 	res.FileReader = ioReader
 	return res, err
+}
+
+func (ctrl *StorageNodeController) DeleteObject(ctx *gin.Context) error {
+	req := types.GetObjectMetadataReq{}
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		return fmt.Errorf("invaild query parameter: %v", err)
+	}
+	return ctrl.StorageNodeSvc.DeleteObject(ctx, req.BucketName, req.ObjectName)
 }

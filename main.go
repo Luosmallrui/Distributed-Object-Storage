@@ -5,6 +5,7 @@ import (
 	"distributed-object-storage/controller"
 	"distributed-object-storage/pkg/db/dao"
 	"fmt"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/urfave/cli"
 	"os"
@@ -56,6 +57,7 @@ func initApp(app *Commands) {
 	//if err := redis.Init(); err != nil {
 	//	logs.Logger.Errorf("Redis can not init %v", err)
 	//}
+	app.server.Use(cors.Default())
 	metaDataController.RegisterRouter(app.server)
 	storageController.RegisterRouter(app.server)
 }

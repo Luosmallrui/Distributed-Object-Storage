@@ -16,7 +16,7 @@ import (
 )
 
 type StorageNode interface {
-	PutObject(ctx context.Context, bucketName, objectName string, data io.Reader, size int64, metadata map[string]string) (string, error)
+	PutObject(ctx context.Context, bucketName, objectName string, data io.Reader, metadata map[string]string) (string, error)
 	GetObject(ctx context.Context, bucketName, objectName string) (io.ReadCloser, types.ObjectInfo, error)
 }
 
@@ -180,4 +180,23 @@ func (s *StorageNodeSvc) GetObject(ctx context.Context, bucketName, objectName s
 	}
 
 	return object, objectInfo, nil
+}
+
+func (s *StorageNodeSvc) DeleteObject(ctx context.Context, bucketName, objectName string) error {
+	client, err := config.ConfigDetail.OssConfig.NewOssClient()
+	if err != nil {
+		return err
+	}
+	// 获取 Bucket
+	bucket, err := client.Bucket(bucketName)
+	if err != nil {
+		return err
+	}
+
+	// 获取对象
+	_, err = bucket.GetObject(objectName)
+	if err != nil {
+		return err
+	}
+	return bucket.DeleteObject(objectName)
 }
