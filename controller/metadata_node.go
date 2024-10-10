@@ -6,6 +6,7 @@ import (
 	"distributed-object-storage/svc"
 	"distributed-object-storage/types"
 	"fmt"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,6 +22,7 @@ func NewMetadataNodeController(daoS *dao.S) *MetadataNodeController {
 
 func (ctrl *MetadataNodeController) RegisterRouter(r gin.IRouter) {
 	g := r.Group("/metadata") // middwares.AuthMiddleware()
+	g.Use(cors.Default())
 	g.GET("/object", service.DataHandlerWrapper(ctrl.GetObjectMetadata))
 	g.GET("/object/list", service.DataHandlerWrapper(ctrl.ListObjectMetadata))
 	g.GET("/bucket/list", service.DataHandlerWrapper(ctrl.ListBucket))
