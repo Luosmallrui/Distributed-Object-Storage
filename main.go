@@ -4,10 +4,10 @@ import (
 	"distributed-object-storage/config"
 	"distributed-object-storage/controller"
 	_ "distributed-object-storage/docs"
-	"github.com/gin-contrib/cors"
-
 	"distributed-object-storage/pkg/db/dao"
+	"distributed-object-storage/pkg/log"
 	"fmt"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/swaggo/files"
 	"github.com/swaggo/gin-swagger"
@@ -18,7 +18,7 @@ import (
 type Commands struct {
 	app    *cli.App
 	server *gin.Engine
-	cfg    *config.Config // 框架基础配置
+	cfg    *config.Config
 }
 
 func (cmd *Commands) GetConfig() *config.Config {
@@ -46,9 +46,12 @@ func main() {
 	//app.server.Use(middwares.Cors())
 	app.server.Use(gin.Logger())
 	app.server.Use(cors.Default())
+
 	//app.server.Use(middwares.AuthMiddleware())
 	initApp(app)
-	err := app.server.Run("0.0.0.0:3002")
+	port := 3002
+	log.Infof("Server starting on port %v", port)
+	err := app.server.Run(fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
 		return
 	}
