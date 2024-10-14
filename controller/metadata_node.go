@@ -29,6 +29,16 @@ func (ctrl *MetadataNodeController) RegisterRouter(r gin.IRouter) {
 
 }
 
+// GetObjectMetadata 获取对象元数据信息
+// @Summary 获取对象元数据信息
+// @Description 根据 bucket_name 和 object_name 查询对象元数据信息
+// @Tags metadata
+// @Accept json
+// @Produce json
+// @Param  types.GetObjectMetadataReq query  types.GetObjectMetadataReq true "Bucket Name"
+// @Success 200 {object} types.ObjectMetadata
+// @Failure 400
+// @Router /metadata/object [get]
 func (ctrl *MetadataNodeController) GetObjectMetadata(ctx *gin.Context) (interface{}, error) {
 	options := types.GetObjectMetadataReq{}
 	if err := ctx.ShouldBindQuery(&options); err != nil {
@@ -103,6 +113,16 @@ func (ctrl *MetadataNodeController) CreateBucket(ctx *gin.Context) error {
 	return ctrl.MetadataNodeSvc.CreateBucket(ctx, bucketName)
 }
 
+// DeleteBucket 删除Bucket
+// @Summary 删除Bucket
+// @Description 根据 name 删除Bucket
+// @Tags metadata
+// @Accept json
+// @Produce json
+// @Param name path string true "Bucket名字"
+// @Success 200
+// @Failure 400
+// @Router /metadata/:name [DELETE]
 func (ctrl *MetadataNodeController) DeleteBucket(ctx *gin.Context) error {
 	bucketName := ctx.Param("name")
 	if bucketName == "" {

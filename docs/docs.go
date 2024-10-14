@@ -45,6 +45,36 @@ const docTemplate = `{
                         "description": "Bad Request"
                     }
                 }
+            },
+            "delete": {
+                "description": "根据 name 删除Bucket",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metadata"
+                ],
+                "summary": "删除Bucket",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bucket名字",
+                        "name": "name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
             }
         },
         "/metadata/bucket/list": {
@@ -82,6 +112,44 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/types.BucketInfo"
                             }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            }
+        },
+        "/metadata/object": {
+            "get": {
+                "description": "根据 bucket_name 和 object_name 查询对象元数据信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metadata"
+                ],
+                "summary": "获取对象元数据信息",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "name": "bucket_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "object_name",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.ObjectMetadata"
                         }
                     },
                     "400": {
@@ -139,6 +207,128 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/storage": {
+            "delete": {
+                "description": "根据 bucket_name 和object_name 删除文件",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "storage"
+                ],
+                "summary": "删除文件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "name": "bucket_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "object_name",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            }
+        },
+        "/storage/object": {
+            "get": {
+                "description": "根据 bucket_name 和 object_name 查询文件信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "storage"
+                ],
+                "summary": "获取文件信息",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "name": "bucket_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "object_name",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功返回上传的文件信息",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    }
+                }
+            }
+        },
+        "/storage/upload": {
+            "post": {
+                "description": "根据 bucket_name 和 object_name 上传文件",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "storage"
+                ],
+                "summary": "上传文件",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bucket Name",
+                        "name": "bucket_name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Object Name",
+                        "name": "object_name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "File to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功返回上传的文件ETag",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "错误响应"
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -189,6 +379,50 @@ const docTemplate = `{
                 "size": {
                     "description": "对象的⼤⼩（字节）",
                     "type": "integer"
+                }
+            }
+        },
+        "types.ObjectMetadata": {
+            "type": "object",
+            "properties": {
+                "bucket_name": {
+                    "description": "对象所属的桶名称",
+                    "type": "string"
+                },
+                "content_type": {
+                    "description": "对象的内容类型",
+                    "type": "string"
+                },
+                "e_tag": {
+                    "description": "对象的 ETag （通常是内容的 MD5 哈希）",
+                    "type": "string"
+                },
+                "is_latest": {
+                    "description": "是否是最新版本",
+                    "type": "boolean"
+                },
+                "last_modified": {
+                    "description": "对象最后修改时间",
+                    "type": "string"
+                },
+                "object_name": {
+                    "description": "对象的名称",
+                    "type": "string"
+                },
+                "size": {
+                    "description": "对象的⼤⼩（字节）",
+                    "type": "integer"
+                },
+                "storage_nodes": {
+                    "description": "存储该对象的节点列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "version_id": {
+                    "description": "对象的版本 ID （如果启⽤了版本控制）",
+                    "type": "string"
                 }
             }
         }

@@ -4,9 +4,10 @@ import (
 	"distributed-object-storage/config"
 	"distributed-object-storage/controller"
 	_ "distributed-object-storage/docs"
+	"github.com/gin-contrib/cors"
+
 	"distributed-object-storage/pkg/db/dao"
 	"fmt"
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/swaggo/files"
 	"github.com/swaggo/gin-swagger"
@@ -44,10 +45,10 @@ func main() {
 	//logs.InitLogger()
 	//app.server.Use(middwares.Cors())
 	app.server.Use(gin.Logger())
+	app.server.Use(cors.Default())
 	//app.server.Use(middwares.AuthMiddleware())
 	initApp(app)
-	fmt.Println(app.cfg.OssConfig)
-	err := app.server.Run("0.0.0.0:8080")
+	err := app.server.Run("0.0.0.0:3002")
 	if err != nil {
 		return
 	}
@@ -60,8 +61,6 @@ func initApp(app *Commands) {
 	//if err := redis.Init(); err != nil {
 	//	logs.Logger.Errorf("Redis can not init %v", err)
 	//}
-
-	app.server.Use(cors.Default())
 	app.server.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	metaDataController.RegisterRouter(app.server)
 	storageController.RegisterRouter(app.server)
