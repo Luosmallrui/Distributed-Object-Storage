@@ -26,7 +26,7 @@ func (ctrl *StorageNodeController) RegisterRouter(r gin.IRouter) {
 	g := r.Group("/storage") // middwares.AuthMiddleware()
 	g.POST("/upload", service.DataHandlerWrapper(ctrl.PutObject))
 	g.GET("/object", service.DataHandlerWrapper(ctrl.GetObject))
-	g.DELETE("/", service.NoDataHandlerWrapper(ctrl.DeleteObject))
+	g.DELETE("/delete", service.NoDataHandlerWrapper(ctrl.DeleteObject))
 }
 
 // PutObject 上传文件
@@ -83,7 +83,7 @@ func (ctrl *StorageNodeController) GetObject(ctx *gin.Context) (interface{}, err
 // @Param  types.GetObjectMetadataReq query  types.GetObjectMetadataReq true "Bucket Name"
 // @Success 200
 // @Failure 400
-// @Router /storage [DELETE]
+// @Router /storage/delete [DELETE]
 func (ctrl *StorageNodeController) DeleteObject(ctx *gin.Context) error {
 	req := types.GetObjectMetadataReq{}
 	if err := ctx.ShouldBindQuery(&req); err != nil {

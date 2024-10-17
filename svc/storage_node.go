@@ -2,7 +2,6 @@ package svc
 
 import (
 	"context"
-	"distributed-object-storage/config"
 	"distributed-object-storage/pkg/db/dao"
 	"distributed-object-storage/pkg/minIo"
 	"distributed-object-storage/types"
@@ -10,13 +9,10 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/minio/minio-go/v7"
-
 	//"github.com/minio/minio-go/v7"
 	"io"
 	"log"
 	"strconv"
-	"strings"
-	"time"
 )
 
 type StorageNode interface {
@@ -134,58 +130,29 @@ func SplitFileByPartSize(fileSize int64, chunkSize int64) ([]oss.FileChunk, erro
 }
 
 func (s *StorageNodeSvc) GetObject(ctx context.Context, bucketName, objectName string) (io.ReadCloser, types.ObjectInfo, error) {
-	client, err := config.ConfigDetail.OssConfig.NewOssClient()
-	ObjectInfo := types.ObjectInfo{}
+	client := minIo.GetMinioClient("127.0.0.1:9000")
+	if client == nil {
+		return nil, types.ObjectInfo{}, errors.New("minio client is nil")
+	}
+	object, ObjectInfo, Header, err := client.MinioCore.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, types.ObjectInfo{}, err
 	}
-	// 获取 Bucket
-	bucket, err := client.Bucket(bucketName)
-	if err != nil {
-		return nil, ObjectInfo, err
-	}
-
-	// 获取对象
-	object, err := bucket.GetObject(objectName)
-	if err != nil {
-		return nil, ObjectInfo, err
-	}
-
-	// 获取对象元数据
-	var size int64
-	var LastModified time.Time
-	headers, _ := bucket.GetObjectMeta(objectName)
-	if contentLengthStr := headers.Get("Content-Length"); contentLengthStr != "" {
-		size, err = strconv.ParseInt(contentLengthStr, 10, 64)
-	}
-	if lastModifiedStr := headers.Get("Last-Modified"); lastModifiedStr != "" {
-		LastModified, err = time.Parse(time.RFC1123, lastModifiedStr)
-	}
 	objectInfo := types.ObjectInfo{
-		Name:         objectName,
-		Size:         size,
-		ETag:         strings.Trim(headers.Get("ETag"), "\""),
-		LastModified: LastModified,
+		Name:         ObjectInfo.Key,
+		Size:         ObjectInfo.Size,
+		ETag:         ObjectInfo.ETag,
+		LastModified: ObjectInfo.LastModified,
+		Header:       Header,
 	}
 
 	return object, objectInfo, nil
 }
 
 func (s *StorageNodeSvc) DeleteObject(ctx context.Context, bucketName, objectName string) error {
-	client, err := config.ConfigDetail.OssConfig.NewOssClient()
-	if err != nil {
-		return err
+	client := minIo.GetMinioClient("127.0.0.1:9000")
+	if client == nil {
+		return errors.New("minio client is nil")
 	}
-	// 获取 Bucket
-	bucket, err := client.Bucket(bucketName)
-	if err != nil {
-		return err
-	}
-
-	// 获取对象
-	_, err = bucket.GetObject(objectName)
-	if err != nil {
-		return err
-	}
-	return bucket.DeleteObject(objectName)
+	return client.MinioCore.RemoveObject(ctx, bucketName, objectName, minio.RemoveObjectOptions{})
 }

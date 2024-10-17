@@ -4,13 +4,42 @@ import (
 	"context"
 	"distributed-object-storage/config"
 	"distributed-object-storage/pkg/db/dao"
+	"distributed-object-storage/pkg/minIo"
 	"distributed-object-storage/types"
 	"fmt"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/minio/minio-go/v7"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var regions = []string{
+	"us-east-1",
+	"us-east-2",
+	"us-west-1",
+	"us-west-2",
+	"ca-central-1",
+	"eu-west-1",
+	"eu-west-2",
+	"eu-west-3",
+	"eu-central-1",
+	"eu-north-1",
+	"ap-east-1",
+	"ap-south-1",
+	"ap-southeast-1",
+	"ap-southeast-2",
+	"ap-northeast-1",
+	"ap-northeast-2",
+	"ap-northeast-3",
+	"me-south-1",
+	"sa-east-1",
+	"us-gov-west-1",
+	"us-gov-east-1",
+	"cn-north-1",
+	"cn-northwest-1",
+}
 
 type MetadataNode interface {
 	CreateObjectMetadata(ctx context.Context, meta types.ObjectMetadata) error
@@ -105,94 +134,83 @@ func (m *MetadataSvc) DeleteObjectMetadata(ctx context.Context, bucketName, obje
 }
 
 func (m *MetadataSvc) CreateBucket(ctx context.Context, bucketName string) error {
-	client, err := config.ConfigDetail.OssConfig.NewOssClient()
-	if err != nil {
-		return fmt.Errorf("failed to create OSS client: %v", err)
+	client := minIo.GetMinioClient("127.0.0.1:9000")
+	if client == nil {
+		return fmt.Errorf("minio client is nil")
 	}
-	return client.CreateBucket(bucketName, oss.StorageClass(oss.StorageIA), oss.ACL(oss.ACLPublicRead), oss.RedundancyType(oss.RedundancyZRS))
+	region := regions[rand.Intn(len(regions))]
+	return client.MinioCore.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{
+		Region:        region,
+		ObjectLocking: false,
+	})
 }
 
 func (m *MetadataSvc) DeleteBucket(ctx context.Context, bucketName string) error {
-	client, err := config.ConfigDetail.OssConfig.NewOssClient()
-	if err != nil {
-		return fmt.Errorf("failed to create OSS client: %v", err)
+	client := minIo.GetMinioClient("127.0.0.1:9000")
+	if client == nil {
+		return fmt.Errorf("minio client is nil")
 	}
-	return client.DeleteBucket(bucketName)
+	return client.MinioCore.RemoveBucket(ctx, bucketName)
 }
 
 func (m *MetadataSvc) ListBuckets(ctx context.Context, prefix string, maxKeys int) ([]types.BucketInfo, error) {
+	client := minIo.GetMinioClient("127.0.0.1:9000")
 	res := make([]types.BucketInfo, 0)
-	ossConfig := config.ConfigDetail.OssConfig
-
-	// 创建OSS客户端
-	client, err := oss.New(ossConfig.Endpoint, ossConfig.AK, ossConfig.SK)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OSS client: %v", err)
-	}
-	var options []oss.Option
-	if maxKeys > 0 {
-		options = append(options, oss.MaxKeys(maxKeys))
-	}
-	if prefix != "" {
-		options = append(options, oss.Prefix(prefix))
-	}
-	lsRes, err := client.ListBuckets(options...)
+	buckets, err := client.MinioCore.ListBuckets(ctx)
 	if err != nil {
 		return res, err
 	}
-	for _, bucket := range lsRes.Buckets {
-		res = append(res, types.BucketInfo{
+	for _, bucket := range buckets {
+		region, _ := client.MinioCore.GetBucketLocation(ctx, bucket.Name)
+		bucketInfo := types.BucketInfo{
 			Name:         bucket.Name,
 			CreationDate: bucket.CreationDate,
-			Location:     bucket.Location,
-			StorageClass: bucket.StorageClass,
-			Region:       bucket.Region,
-		})
+			Owner:        "",
+			Location:     "127.0.0.1:9000",
+			StorageClass: "",
+			Region:       region,
+		}
+		res = append(res, bucketInfo)
 	}
 	return res, nil
 }
 
 func (m *MetadataSvc) ListObjects(ctx context.Context, bucketName string, prefix string, maxKeys int) ([]types.ObjectInfo, error) {
+	//res := make([]types.ObjectInfo, 0)
+	client := minIo.GetMinioClient("127.0.0.1:9000")
+
+	if maxKeys <= 0 {
+		maxKeys = 100 // 设置默认值
+	}
+	var allObjects []minio.ObjectInfo
+	continuationToken := ""
+	for {
+		result, err := client.MinioCore.ListObjectsV2(bucketName, prefix, "", continuationToken, "", maxKeys)
+		if err != nil {
+			return nil, err
+		}
+
+		allObjects = append(allObjects, result.Contents...)
+		// 检查是否还有更多对象
+		if len(result.Contents) < maxKeys {
+			break // 没有更多对象了
+		}
+		continuationToken = result.NextContinuationToken // 更新 continuationToken
+	}
 	res := make([]types.ObjectInfo, 0)
-	ossConfig := config.ConfigDetail.OssConfig
-
-	// 创建OSS客户端
-	client, err := oss.New(ossConfig.Endpoint, ossConfig.AK, ossConfig.SK)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OSS client: %v", err)
-	}
-
-	// 获取bucket实例
-	bucket, err := client.Bucket(bucketName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get bucket: %v", err)
-	}
-
-	// 构建可选参数
-	options := []oss.Option{}
-	if maxKeys > 0 {
-		options = append(options, oss.MaxKeys(maxKeys))
-	}
-	if prefix != "" {
-		options = append(options, oss.Prefix(prefix))
-	}
-
-	// 列出对象
-	lsRes, err := bucket.ListObjects(options...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list objects: %v", err)
-	}
-
-	// 处理对象信息
-	for _, object := range lsRes.Objects {
-		res = append(res, types.ObjectInfo{
+	for _, object := range allObjects {
+		objectInfo := types.ObjectInfo{
 			Name:         object.Key,
-			Size:         object.Size,
 			ETag:         strings.Trim(object.ETag, "\""),
+			Size:         object.Size,
 			LastModified: object.LastModified,
-		})
+			StorageClass: object.StorageClass,
+		}
+		if len(object.Metadata) == 0 {
+			objectInfo.Header = make(map[string][]string)
+		}
+		res = append(res, objectInfo)
 	}
-
 	return res, nil
 }
 
