@@ -6,6 +6,7 @@ import (
 	_ "distributed-object-storage/docs"
 	"distributed-object-storage/pkg/db/dao"
 	"distributed-object-storage/pkg/log"
+	"distributed-object-storage/pkg/minIo"
 	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -46,7 +47,6 @@ func main() {
 	//app.server.Use(middwares.Cors())
 	app.server.Use(gin.Logger())
 	app.server.Use(cors.Default())
-
 	//app.server.Use(middwares.AuthMiddleware())
 	initApp(app)
 	port := 3002
@@ -59,6 +59,8 @@ func main() {
 
 func initApp(app *Commands) {
 	dos := dao.Init()
+	fmt.Println(minIo.GetStorageNodeList())
+	fmt.Println(minIo.GetSeverInfo())
 	metaDataController := controller.NewMetadataNodeController(dos)
 	storageController := controller.NewStorageNodeController(dos)
 	//if err := redis.Init(); err != nil {
