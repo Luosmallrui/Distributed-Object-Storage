@@ -60,7 +60,7 @@ func main() {
 func initApp(app *Commands) {
 	dos := dao.Init()
 	fmt.Println(minIo.GetStorageNodeList())
-	fmt.Println(minIo.GetSeverInfo())
+	//fmt.Println(minIo.GetSeverInfo())
 	metaDataController := controller.NewMetadataNodeController(dos)
 	storageController := controller.NewStorageNodeController(dos)
 	//if err := redis.Init(); err != nil {

@@ -4,10 +4,14 @@ import (
 	"context"
 	"distributed-object-storage/config"
 	"distributed-object-storage/pkg/db/dao"
+	"distributed-object-storage/pkg/minIo"
 	"distributed-object-storage/types"
 	"errors"
 	"fmt"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/minio/minio-go/v7"
+
+	//"github.com/minio/minio-go/v7"
 	"io"
 	"log"
 	"strconv"
@@ -45,24 +49,9 @@ PutObject 存储⼀个完整的对象。
   - 实现数据的冗余存储或纠删码
   - 考虑磁盘空间管理和数据均衡
 */
-func (s *StorageNodeSvc) PutObject(ctx context.Context, bucketName, objectName string, data io.Reader, metadata map[string]string) (string, error) {
-	client, err := config.ConfigDetail.OssConfig.NewOssClient()
-	if err != nil {
-		return "", err
-	}
-	bucket, err := client.Bucket(bucketName)
-	if err != nil {
-		log.Fatalf("Error: %v", err)
-	}
-	// 设置分片大小（单位：字节），指定5MB为分片大小。
-	partSize := int64(5 * 1024 * 1024)
-
-	// 调用分片上传函数。
-	if err := uploadMultipart(bucket, objectName, data, partSize, metadata); err != nil {
-		log.Fatalf("Failed to upload multipart: %v", err)
-	}
-	props, err := bucket.GetObjectDetailedMeta(objectName)
-	return strings.Trim(props.Get("ETag"), "\""), nil
+func (s *StorageNodeSvc) PutObject(ctx context.Context, bucketName, objectName, filePath string) (*minio.UploadInfo, error) {
+	client := minIo.GetMinioClient("127.0.0.1:9000")
+	return client.Upload(ctx, bucketName, objectName, filePath)
 }
 
 // 分片上传函数

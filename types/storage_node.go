@@ -16,3 +16,9 @@ type DiskUsage struct {
 	AvailableSpace  int64   //可⽤存储空间（字节）
 	UsagePercentage float64 // 使⽤率（百分⽐）
 }
+
+type UploadReq struct {
+	BucketName string `json:"bucket_name" form:"bucket_name" `
+	ObjectName string `json:"object_name" form:"object_name" `
+	FilePath   string `json:"file_path" form:"file_path" `
+}

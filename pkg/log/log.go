@@ -41,6 +41,10 @@ func Error(args ...interface{}) {
 	logger.Error(args...)
 }
 
+func Errorf(format string, args ...interface{}) {
+	logger.Errorf(format, args...)
+}
+
 // Debug 级别日志
 func Debug(args ...interface{}) {
 	logger.Debug(args...)

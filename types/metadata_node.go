@@ -45,6 +45,7 @@ type CompletedPart struct {
 type GetObjectMetadataReq struct {
 	BucketName string `json:"bucket_name" form:"bucket_name" `
 	ObjectName string `json:"object_name" form:"object_name" `
+	FilePath   string `json:"file_path" form:"file_path" `
 }
 
 type ListObjectMetadataReq struct {
