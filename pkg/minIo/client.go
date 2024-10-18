@@ -20,6 +20,7 @@ import (
 )
 
 var StorageClient *MinioHelper
+var etcdClient *client.Client
 
 const (
 	ChunkPartSize = 1024 * 1024 * 5
@@ -28,7 +29,8 @@ const (
 
 func GetStorageNodeList() ([]types.KvStorage, error) {
 	storageNodeList := make([]types.KvStorage, 0)
-	etcdClient, err := client.New(client.Config{
+	var err error
+	etcdClient, err = client.New(client.Config{
 		Endpoints: []string{"http://0.0.0.0:2379"},
 	})
 	if err != nil {

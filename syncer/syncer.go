@@ -90,7 +90,7 @@ func delayFunc() time.Duration {
 }
 
 func getRedisLock(name string) *redis.Lock {
-	key := fmt.Sprintf("nice-offer%s", name)
+	key := fmt.Sprintf("test%s", name)
 	return redis.NewRedisLock(key)
 }
 

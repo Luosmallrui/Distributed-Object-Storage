@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"distributed-object-storage/config"
 	"distributed-object-storage/controller"
 	_ "distributed-object-storage/docs"
 	"distributed-object-storage/pkg/db/dao"
 	"distributed-object-storage/pkg/log"
-	"distributed-object-storage/pkg/minIo"
+	"distributed-object-storage/redis"
+	"distributed-object-storage/syncer"
 	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -59,13 +61,12 @@ func main() {
 
 func initApp(app *Commands) {
 	dos := dao.Init()
-	fmt.Println(minIo.GetStorageNodeList())
-	//fmt.Println(minIo.GetSeverInfo())
+	if err := redis.Init(); err != nil {
+		log.Errorf("Redis can not init %v", err)
+	}
+	syncer.Init(context.Background())
 	metaDataController := controller.NewMetadataNodeController(dos)
 	storageController := controller.NewStorageNodeController(dos)
-	//if err := redis.Init(); err != nil {
-	//	logs.Logger.Errorf("Redis can not init %v", err)
-	//}
 	app.server.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	metaDataController.RegisterRouter(app.server)
 	storageController.RegisterRouter(app.server)

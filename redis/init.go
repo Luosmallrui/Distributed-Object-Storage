@@ -15,12 +15,11 @@ type Config struct {
 	Password string `yaml:"password,omitempty"`
 }
 
-func Init(config *Config) error {
+func Init() error {
 	rdb = redis.NewClient(&redis.Options{
-		Addr:       config.Addr,
-		Password:   config.Password, // no password set
-		MaxRetries: -1,              // Not Retry
-		DB:         0,               // use default DB
+		Addr:       "0.0.0.0:6379",
+		MaxRetries: -1, // Not Retry
+		DB:         0,  // use default DB
 	})
 
 	pong, err := rdb.Ping(context.Background()).Result()
