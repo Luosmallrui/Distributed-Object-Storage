@@ -35,6 +35,9 @@ func SetLogLevel(level logrus.Level) {
 func Warn(args ...interface{}) {
 	logger.Warn(args...)
 }
+func Warnf(format string, args ...interface{}) {
+	logger.Warnf(format, args...)
+}
 
 // Error 级别日志
 func Error(args ...interface{}) {
