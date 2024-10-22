@@ -14,7 +14,7 @@ type S struct {
 func Init() *S {
 	return &S{
 		Base: &Base{
-			DB: db.Db(),
+			//DB: db.Db(),
 		},
 		DB:           db.Db(),
 		MetadataNode: MetadataNode{},

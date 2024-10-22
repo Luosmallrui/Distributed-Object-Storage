@@ -20,6 +20,7 @@ func NewMetadataNodeController(daoS *dao.S) *MetadataNodeController {
 }
 
 func (ctrl *MetadataNodeController) RegisterRouter(r gin.IRouter) {
+	fmt.Println(11)
 	g := r.Group("/metadata") // middwares.AuthMiddleware()
 	g.GET("/object", service.DataHandlerWrapper(ctrl.GetObjectMetadata))
 	g.GET("/object/list", service.DataHandlerWrapper(ctrl.ListObjectMetadata))

@@ -45,9 +45,6 @@ func NewCommands() *Commands {
 
 func main() {
 	app := NewCommands()
-	//logs.InitLogger()
-	//app.server.Use(middwares.Cors())
-	app.server.Use(gin.Logger())
 	app.server.Use(cors.Default())
 	//app.server.Use(middwares.AuthMiddleware())
 	initApp(app)
@@ -64,10 +61,16 @@ func initApp(app *Commands) {
 	if err := redis.Init(); err != nil {
 		log.Errorf("Redis can not init %v", err)
 	}
-	syncer.Init(context.Background())
 	metaDataController := controller.NewMetadataNodeController(dos)
 	storageController := controller.NewStorageNodeController(dos)
+	loginController := controller.NewLoginController(dos)
 	app.server.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	metaDataController.RegisterRouter(app.server)
 	storageController.RegisterRouter(app.server)
+	loginController.RegisterRouter(app.server)
+	go func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		syncer.Init(ctx)
+	}()
 }
