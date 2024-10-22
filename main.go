@@ -63,11 +63,11 @@ func initApp(app *Commands) {
 	}
 	metaDataController := controller.NewMetadataNodeController(dos)
 	storageController := controller.NewStorageNodeController(dos)
-	loginController := controller.NewLoginController(dos)
+	authController := controller.NewAuthController(dos)
 	app.server.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	metaDataController.RegisterRouter(app.server)
 	storageController.RegisterRouter(app.server)
-	loginController.RegisterRouter(app.server)
+	authController.RegisterRouter(app.server)
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

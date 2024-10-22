@@ -25,6 +25,12 @@ definitions:
       etag:
         description: 对象的 ETag
         type: string
+      hear:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        type: object
       last_modified:
         description: 对象最后修改时间
         type: string
@@ -34,6 +40,8 @@ definitions:
       size:
         description: 对象的⼤⼩（字节）
         type: integer
+      storage_class:
+        type: string
     type: object
   types.ObjectMetadata:
     properties:
@@ -149,6 +157,9 @@ paths:
         name: bucket_name
         type: string
       - in: query
+        name: file_path
+        type: string
+      - in: query
         name: object_name
         type: string
       produces:
@@ -196,7 +207,7 @@ paths:
       summary: 获取对象元数据列表
       tags:
       - metadata
-  /storage:
+  /storage/delete:
     delete:
       consumes:
       - application/json
@@ -204,6 +215,9 @@ paths:
       parameters:
       - in: query
         name: bucket_name
+        type: string
+      - in: query
+        name: file_path
         type: string
       - in: query
         name: object_name
@@ -226,6 +240,9 @@ paths:
       parameters:
       - in: query
         name: bucket_name
+        type: string
+      - in: query
+        name: file_path
         type: string
       - in: query
         name: object_name

@@ -141,6 +141,11 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "name": "file_path",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "name": "object_name",
                         "in": "query"
                     }
@@ -208,7 +213,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/storage": {
+        "/storage/delete": {
             "delete": {
                 "description": "根据 bucket_name 和object_name 删除文件",
                 "consumes": [
@@ -225,6 +230,11 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "name": "bucket_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "file_path",
                         "in": "query"
                     },
                     {
@@ -260,6 +270,11 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "name": "bucket_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "file_path",
                         "in": "query"
                     },
                     {
@@ -368,6 +383,15 @@ const docTemplate = `{
                     "description": "对象的 ETag",
                     "type": "string"
                 },
+                "hear": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
                 "last_modified": {
                     "description": "对象最后修改时间",
                     "type": "string"
@@ -379,6 +403,9 @@ const docTemplate = `{
                 "size": {
                     "description": "对象的⼤⼩（字节）",
                     "type": "integer"
+                },
+                "storage_class": {
+                    "type": "string"
                 }
             }
         },

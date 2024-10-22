@@ -64,7 +64,7 @@ type MetadataSvc struct {
 
 func NewMetadataSvc(s *dao.S) *MetadataSvc {
 	return &MetadataSvc{
-		MetaDataDao: &s.MetadataNode,
+		MetaDataDao: s.MetadataNode,
 	}
 }
 

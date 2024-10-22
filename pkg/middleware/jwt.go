@@ -27,16 +27,16 @@ var users = []User{
 }
 
 type Claims struct {
-	UserID int    `json:"user_id"`
-	Role   string `json:"role"`
+	UserID   uint   `json:"id"`
+	UserName string `json:"userName"`
 	jwt.RegisteredClaims
 }
 
 // GenerateJWT 生成 JWTToken
-func GenerateJWT(userID int, role string) (string, error) {
+func GenerateJWT(userID uint, userName string) (string, error) {
 	claims := Claims{
-		UserID: userID,
-		Role:   role,
+		UserID:   userID,
+		UserName: userName,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)), // JWT 24小时后过期
 		},
@@ -93,7 +93,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// 将用户 ID 和角色存储到上下文中，便于后续使用
 		c.Set("userID", claims.UserID)
-		c.Set("role", claims.Role)
+		c.Set("role", claims.UserName)
 
 		c.Next()
 	}

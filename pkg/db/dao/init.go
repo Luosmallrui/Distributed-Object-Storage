@@ -8,15 +8,17 @@ import (
 type S struct {
 	*Base
 	DB           *gorm.DB
-	MetadataNode MetadataNode
+	MetadataNode *MetadataNode
+	User         *User
 }
 
 func Init() *S {
 	return &S{
 		Base: &Base{
-			//DB: db.Db(),
+			DB: db.Db(),
 		},
 		DB:           db.Db(),
-		MetadataNode: MetadataNode{},
+		MetadataNode: NewMetadataNode(db.Db()),
+		User:         NewUser(db.Db()),
 	}
 }

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"distributed-object-storage/pkg/db/dao"
+	"distributed-object-storage/pkg/middleware"
 	"distributed-object-storage/service"
 	"distributed-object-storage/svc"
 	"distributed-object-storage/types"
@@ -20,11 +21,10 @@ func NewMetadataNodeController(daoS *dao.S) *MetadataNodeController {
 }
 
 func (ctrl *MetadataNodeController) RegisterRouter(r gin.IRouter) {
-	fmt.Println(11)
 	g := r.Group("/metadata") // middwares.AuthMiddleware()
 	g.GET("/object", service.DataHandlerWrapper(ctrl.GetObjectMetadata))
 	g.GET("/object/list", service.DataHandlerWrapper(ctrl.ListObjectMetadata))
-	g.GET("/bucket/list", service.DataHandlerWrapper(ctrl.ListBucket))
+	g.GET("/bucket/list", middleware.AuthMiddleware(), service.DataHandlerWrapper(ctrl.ListBucket))
 	g.POST("/bucket/:name", service.NoDataHandlerWrapper(ctrl.CreateBucket))
 	g.DELETE("/bucket/:name", service.NoDataHandlerWrapper(ctrl.DeleteBucket))
 
