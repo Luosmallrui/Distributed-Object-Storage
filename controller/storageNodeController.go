@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"io"
+	"net/http"
 )
 
 type StorageNodeController struct {
@@ -25,7 +27,8 @@ func NewStorageNodeController(daoS *dao.S) *StorageNodeController {
 func (ctrl *StorageNodeController) RegisterRouter(r gin.IRouter) {
 	g := r.Group("/storage") // middwares.AuthMiddleware()
 	g.POST("/upload", service.DataHandlerWrapper(ctrl.PutObject))
-	g.GET("/object", service.DataHandlerWrapper(ctrl.GetObject))
+	//g.POST("/download", service.DataHandlerWrapper(ctrl.MetadataNodeSvc))
+	g.GET("/object", ctrl.GetObject)
 	g.DELETE("/delete", service.NoDataHandlerWrapper(ctrl.DeleteObject))
 }
 
@@ -52,7 +55,7 @@ func (ctrl *StorageNodeController) PutObject(ctx *gin.Context) (interface{}, err
 	return ctrl.StorageNodeSvc.PutObject(ctx, req.BucketName, req.ObjectName, req.FilePath)
 }
 
-// GetObject 获取文件信息
+// GetObject 下载分文
 // @Summary 获取文件信息
 // @Description 根据 bucket_name 和 object_name 查询文件信息
 // @Tags storage
@@ -62,16 +65,30 @@ func (ctrl *StorageNodeController) PutObject(ctx *gin.Context) (interface{}, err
 // @Success 200 {object} object "成功返回上传的文件信息"
 // @Failure 400
 // @Router /storage/object [GET]
-func (ctrl *StorageNodeController) GetObject(ctx *gin.Context) (interface{}, error) {
+func (ctrl *StorageNodeController) GetObject(ctx *gin.Context) {
 	req := types.GetObjectMetadataReq{}
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		return nil, fmt.Errorf("invaild query parameter: %v", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 	res := types.GetObjectReq{BucketName: req.BucketName}
 	ioReader, objectInfo, err := ctrl.StorageNodeSvc.GetObject(ctx, req.BucketName, req.ObjectName)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	}
 	res.ObjectInfo = objectInfo
 	res.FileReader = ioReader
-	return res, err
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", objectInfo.Name))
+	//ctx.Header("Content-Length", fmt.Sprintf("%d", objectInfo.Size))
+	ctx.Stream(func(w io.Writer) bool {
+		_, err := io.Copy(w, ioReader)
+		if err != nil {
+			// 处理错误
+			ctx.Error(err)
+			return false
+		}
+		return false // 复制完成后返回 false 结束流
+	})
+	return
 }
 
 // DeleteObject 删除文件
