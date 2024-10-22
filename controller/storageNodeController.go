@@ -45,14 +45,27 @@ func (ctrl *StorageNodeController) RegisterRouter(r gin.IRouter) {
 // @Failure 400   "错误响应"
 // @Router /storage/upload [POST]
 func (ctrl *StorageNodeController) PutObject(ctx *gin.Context) (interface{}, error) {
-	req := types.UploadReq{}
-	if err := ctx.BindJSON(&req); err != nil {
-		return nil, fmt.Errorf("invaild query parameter: %v", err)
+	// 获取上传的文件
+	file, header, err := ctx.Request.FormFile("file")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file from request: %v", err)
 	}
-	if req.BucketName == "" || req.FilePath == "" {
+	defer file.Close() // 确保文件流在函数结束时关闭
+
+	// 获取文件的大小和文件名
+	fileSize := header.Size
+	//fileName := header.Filename
+	// 从请求中获取其他表单字段，比如 bucket_name 和 object_name
+	bucketName := ctx.PostForm("bucket_name")
+	objectName := ctx.PostForm("object_name")
+
+	// 验证必填字段
+	if bucketName == "" || objectName == "" {
 		return nil, errors.New("bucket_name and object_name required in parameter")
 	}
-	return ctrl.StorageNodeSvc.PutObject(ctx, req.BucketName, req.ObjectName, req.FilePath)
+
+	// 调用存储服务，上传文件
+	return ctrl.StorageNodeSvc.PutObject(ctx, bucketName, objectName, file, fileSize)
 }
 
 // GetObject 下载分文
@@ -78,15 +91,14 @@ func (ctrl *StorageNodeController) GetObject(ctx *gin.Context) {
 	res.ObjectInfo = objectInfo
 	res.FileReader = ioReader
 	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", objectInfo.Name))
-	//ctx.Header("Content-Length", fmt.Sprintf("%d", objectInfo.Size))
+	ctx.Header("Content-Length", fmt.Sprintf("%d", objectInfo.Size))
 	ctx.Stream(func(w io.Writer) bool {
 		_, err := io.Copy(w, ioReader)
 		if err != nil {
-			// 处理错误
 			ctx.Error(err)
 			return false
 		}
-		return false // 复制完成后返回 false 结束流
+		return true // 复制完成后返回 false 结束流
 	})
 	return
 }

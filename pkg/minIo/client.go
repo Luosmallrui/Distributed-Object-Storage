@@ -6,11 +6,11 @@ import (
 	"distributed-object-storage/pkg/log"
 	"distributed-object-storage/types"
 	"encoding/json"
+	"fmt"
 	"github.com/minio/minio-go/v7"
 	client "go.etcd.io/etcd/client/v3"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -202,38 +202,14 @@ type MinioHelper struct {
 	MinioCore *minio.Core
 }
 
-func (helper *MinioHelper) Upload(ctx context.Context, bucketName, objectName string, filePath string) (*minio.UploadInfo, error) {
-	openFile, err := os.Open(filePath)
-	defer openFile.Close()
-	if err != nil {
-		log.Errorf("openfile failed: %v", err)
-		return nil, err
+func (helper *MinioHelper) Upload(ctx context.Context, bucketName, objectName string, reader io.Reader, size int64) (*minio.UploadInfo, error) {
+	// If the size is small enough, upload directly
+	if size <= ChunkPartSize {
+		return uploadFile(ctx, bucketName, objectName, reader, size)
 	}
 
-	fileInfo, err := openFile.Stat()
-	if err != nil {
-		log.Errorf("get openfile statInfo error: %v", err)
-		return nil, err
-	}
-	chunkCount := int(fileInfo.Size()) / ChunkPartSize
-	if chunkCount <= 1 {
-		return uploadFile(ctx, bucketName, objectName, filePath, fileInfo)
-	}
-	return uploadFileWithCP(ctx, filePath, bucketName, objectName, chunkCount)
-}
-
-func GetMinioHelper() *MinioHelper {
-	return StorageClient
-}
-
-func isObjectExist(ctx context.Context, bucketName string, objectName string, fileSize int64) bool {
-	objInfo, err := StorageClient.MinioCore.StatObject(ctx, bucketName, objectName, minio.StatObjectOptions{})
-	if err != nil {
-		log.Errorf("get object error, bucket: %s, obj: %s, error: %s", bucketName, objectName, err)
-		return false
-	}
-	log.Info("exist file info: ", objInfo)
-	return fileSize == objInfo.Size
+	// For larger files, use multipart upload
+	return uploadFileWithCP(ctx, reader, bucketName, objectName, size)
 }
 
 // listObjectParts 列出已上传的分片
@@ -266,85 +242,96 @@ func listObjectParts(ctx context.Context, bucketName, objectName, uploadID strin
 }
 
 // uploadFileWithCP 通过checkPoint文件上传
-func uploadFileWithCP(ctx context.Context, filePath, bucketName, objectName string, chunkCount int) (*minio.UploadInfo, error) {
-	openFile, err := os.Open(filePath)
-	defer openFile.Close()
+func uploadFileWithCP(ctx context.Context, reader io.Reader, bucketName, objectName string, size int64) (*minio.UploadInfo, error) {
+	chunkCount := int(size / ChunkPartSize)
+	if size%ChunkPartSize != 0 {
+		chunkCount++
+	}
+
+	// Create a new MultipartFile
+	cpFile := &MultipartFile{
+		BucketName: bucketName,
+		FileInfo: FileInfo{
+			Name:    objectName,
+			Size:    size,
+			ModTime: time.Now(),
+		},
+	}
+
+	// Initialize multipart upload
+	uploadID, err := StorageClient.MinioCore.NewMultipartUpload(ctx, bucketName, objectName, minio.PutObjectOptions{})
 	if err != nil {
+		log.Errorf("NewMultipartUpload error: %v", err)
 		return nil, err
 	}
-	fileInfo, err := openFile.Stat()
-	if err != nil {
-		return nil, err
+	cpFile.UploadId = uploadID
+
+	// Prepare chunks
+	chunks := make([]fileChunk, chunkCount)
+	for i := 0; i < chunkCount; i++ {
+		chunks[i] = fileChunk{
+			PartNumber: i + 1,
+			Start:      i * ChunkPartSize,
+			End:        min((i+1)*ChunkPartSize, int(size)),
+		}
 	}
 
-	// 获取分片上传信息
-	var cpFile = new(MultipartFile)
+	// Set up channels for parallel processing
+	jobs := make(chan fileChunk, len(chunks))
+	results := make(chan minio.CompletePart, len(chunks))
+	errs := make(chan error, 1)
 
-	cpFilePath, err := cpFile.load(ctx, bucketName, objectName, fileInfo)
-	if err != nil {
-		return nil, err
-	}
-	// 查询已上传分片
-	chunks, err := cpFile.getChunks(ctx, chunkCount, bucketName, objectName)
-	if err != nil {
-		return nil, err
-	}
+	// Start worker goroutines
+	workerCount := 5 // You can adjust this number
+	for i := 0; i < workerCount; i++ {
+		go func() {
+			for chunk := range jobs {
+				buffer := make([]byte, chunk.End-chunk.Start)
+				_, err := io.ReadFull(reader, buffer)
+				if err != nil {
+					errs <- fmt.Errorf("read chunk error: %v", err)
+					return
+				}
 
-	fileBytes, err := ioutil.ReadAll(openFile)
-	if err != nil {
-		return nil, err
-	}
+				part, err := chunkUpload(ctx, buffer, bucketName, objectName, uploadID, chunk.PartNumber)
+				if err != nil {
+					errs <- fmt.Errorf("upload chunk error: %v", err)
+					return
+				}
 
-	// 继续上传未上传分片
-	var jobs = make(chan fileChunk, len(chunks))
-	var results = make(chan minio.CompletePart, len(chunks))
-	var failed = make(chan error)
-	var die = make(chan bool)
-
-	// 分片上传
-	routines := 5
-	if len(chunks) < 5 {
-		routines = len(chunks)
-	}
-	for i := 0; i < routines; i++ {
-		go work(ctx, jobs, fileBytes, bucketName, objectName, cpFile.UploadId, failed, results, die)
+				results <- part
+			}
+		}()
 	}
 
-	go scheduler(jobs, chunks)
+	// Send jobs to workers
+	go func() {
+		for _, chunk := range chunks {
+			jobs <- chunk
+		}
+		close(jobs)
+	}()
 
-	completed := 0
-	for completed < len(chunks) {
+	// Collect results
+	cpFile.CompletedParts = make([]minio.CompletePart, chunkCount)
+	for i := 0; i < chunkCount; i++ {
 		select {
 		case part := <-results:
-			completed++
 			cpFile.CompletedParts[part.PartNumber-1] = part
-			cpFile.dump(cpFilePath)
-		case err := <-failed:
-			close(die) // 停止worker
+		case err := <-errs:
 			return nil, err
-		}
-
-		if completed >= len(chunks) {
-			break
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
 	}
 
-	return complete(ctx, bucketName, objectName, cpFile, cpFilePath)
+	// Complete multipart upload
+	return complete(ctx, bucketName, objectName, cpFile, "")
 }
 
 // uploadFile 不分片直接上传
-func uploadFile(ctx context.Context, bucketName, objectName, filePath string, fileInfo os.FileInfo) (*minio.UploadInfo, error) {
-	// 只有一片直接上传
-	openFile, err := os.Open(filePath)
-	defer openFile.Close()
-	if err != nil {
-		return nil, err
-	}
-	fileName := fileInfo.Name()
-	if objectName != "" {
-		fileName = objectName
-	}
-	uploadInfo, err := StorageClient.MinioCore.PutObject(ctx, bucketName, fileName, openFile, fileInfo.Size(), "", "", minio.PutObjectOptions{})
+func uploadFile(ctx context.Context, bucketName, objectName string, reader io.Reader, size int64) (*minio.UploadInfo, error) {
+	uploadInfo, err := StorageClient.MinioCore.PutObject(ctx, bucketName, objectName, reader, size, "", "", minio.PutObjectOptions{})
 	if err != nil {
 		log.Errorf("put object error: %v", err)
 		return nil, err
@@ -354,14 +341,13 @@ func uploadFile(ctx context.Context, bucketName, objectName, filePath string, fi
 
 // chunkUpload 上传分片
 func chunkUpload(ctx context.Context, buf []byte, bucketName string, fileName, uploadId string, partNumber int) (minio.CompletePart, error) {
-	buffer := bytes.Buffer{}
-	buffer.Write(buf)
-	objectPart, err := StorageClient.MinioCore.PutObjectPart(ctx, bucketName, fileName, uploadId, partNumber, &buffer, int64(buffer.Len()), minio.PutObjectPartOptions{})
+	buffer := bytes.NewBuffer(buf)
+	objectPart, err := StorageClient.MinioCore.PutObjectPart(ctx, bucketName, fileName, uploadId, partNumber, buffer, int64(buffer.Len()), minio.PutObjectPartOptions{})
 	if err != nil {
-		log.Errorf("read buff err: %s", err)
+		log.Errorf("Upload part error: %s", err)
 		return minio.CompletePart{}, err
 	}
-	log.Info("upload chunk success, objectPart PartNumber:", objectPart.PartNumber)
+	log.Info("Upload chunk success, objectPart PartNumber:", objectPart.PartNumber)
 	return minio.CompletePart{
 		ETag:       objectPart.ETag,
 		PartNumber: objectPart.PartNumber,
@@ -401,16 +387,12 @@ func complete(ctx context.Context, bucketName, objectName string, cpFile *Multip
 	sort.Slice(cpFile.CompletedParts, func(i, j int) bool {
 		return cpFile.CompletedParts[i].PartNumber < cpFile.CompletedParts[j].PartNumber
 	})
-	res := &minio.UploadInfo{}
-	UploadInfo, err := StorageClient.MinioCore.CompleteMultipartUpload(ctx, bucketName, objectName, cpFile.UploadId, cpFile.CompletedParts, minio.PutObjectOptions{})
+
+	uploadInfo, err := StorageClient.MinioCore.CompleteMultipartUpload(ctx, bucketName, objectName, cpFile.UploadId, cpFile.CompletedParts, minio.PutObjectOptions{})
 	if err != nil {
 		log.Errorf("CompleteMultipartUpload err: %s", err)
-		return res, err
+		return nil, err
 	}
-	err = os.Remove(cpFilePath)
-	if err != nil {
-		log.Errorf("Failed to remove checkpoint path err: %s", err)
-	}
-	res = &UploadInfo
-	return res, nil
+
+	return &uploadInfo, nil
 }
