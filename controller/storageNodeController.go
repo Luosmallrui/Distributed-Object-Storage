@@ -1,15 +1,17 @@
 package controller
 
 import (
+	"crypto/md5"
 	"distributed-object-storage/pkg/db/dao"
 	"distributed-object-storage/service"
 	"distributed-object-storage/svc"
 	"distributed-object-storage/types"
-	"errors"
+	"encoding/hex"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"io"
 	"net/http"
+	"time"
 )
 
 type StorageNodeController struct {
@@ -26,10 +28,93 @@ func NewStorageNodeController(daoS *dao.S) *StorageNodeController {
 
 func (ctrl *StorageNodeController) RegisterRouter(r gin.IRouter) {
 	g := r.Group("/storage") // middwares.AuthMiddleware()
-	g.POST("/upload", service.DataHandlerWrapper(ctrl.PutObject))
-	//g.POST("/download", service.DataHandlerWrapper(ctrl.MetadataNodeSvc))
+	g.POST("/upload", ctrl.PutObject)
 	g.GET("/object", ctrl.GetObject)
+	g.POST("/pause/:uploadId", handlePause)
+	g.POST("/resume/:uploadId", handleResume)
+	g.POST("/cancel/:uploadId", handleCancel)
+	g.GET("/status/:uploadId", handleStatus)
 	g.DELETE("/delete", service.NoDataHandlerWrapper(ctrl.DeleteObject))
+}
+
+func handleResume(c *gin.Context) {
+	uploadID := c.Param("uploadId")
+	types.UploadTasks.RLock()
+	status, exists := types.UploadTasks.Tasks[uploadID]
+	types.UploadTasks.RUnlock()
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Upload task not found"})
+		return
+	}
+	status.Mutex.Lock()
+	status.IsPaused = false
+	status.Mutex.Unlock()
+	c.JSON(http.StatusOK, gin.H{"message": "Upload resumed"})
+}
+
+func handleStatus(c *gin.Context) {
+	uploadID := c.Param("uploadId")
+
+	types.UploadTasks.RLock()
+	status, exists := types.UploadTasks.Tasks[uploadID]
+	types.UploadTasks.RUnlock()
+
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Upload task not found"})
+		return
+	}
+
+	status.Mutex.Lock()
+	response := gin.H{
+		"is_paused":       status.IsPaused,
+		"is_canceled":     status.IsCanceled,
+		"current_part":    status.CurrentPart,
+		"completed_parts": len(status.CompletedParts),
+	}
+	status.Mutex.Unlock()
+	c.JSON(http.StatusOK, response)
+}
+
+func handleCancel(c *gin.Context) {
+	uploadID := c.Param("uploadId")
+
+	types.UploadTasks.RLock()
+	status, exists := types.UploadTasks.Tasks[uploadID]
+	types.UploadTasks.RUnlock()
+
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Upload task not found"})
+		return
+	}
+
+	status.Mutex.Lock()
+	status.IsCanceled = true
+	status.Mutex.Unlock()
+
+	// 清理上传任务
+	types.UploadTasks.Lock()
+	delete(types.UploadTasks.Tasks, uploadID)
+	types.UploadTasks.Unlock()
+
+	c.JSON(http.StatusOK, gin.H{"message": "Upload canceled"})
+}
+func handlePause(c *gin.Context) {
+	uploadID := c.Param("uploadId")
+
+	types.UploadTasks.RLock()
+	status, exists := types.UploadTasks.Tasks[uploadID]
+	types.UploadTasks.RUnlock()
+
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Upload task not found"})
+		return
+	}
+
+	status.Mutex.Lock()
+	status.IsPaused = true
+	status.Mutex.Unlock()
+
+	c.JSON(http.StatusOK, gin.H{"message": "Upload paused"})
 }
 
 // PutObject 上传文件
@@ -44,28 +129,70 @@ func (ctrl *StorageNodeController) RegisterRouter(r gin.IRouter) {
 // @Success 200 {string} string "成功返回上传的文件ETag"
 // @Failure 400   "错误响应"
 // @Router /storage/upload [POST]
-func (ctrl *StorageNodeController) PutObject(ctx *gin.Context) (interface{}, error) {
-	// 获取上传的文件
-	file, header, err := ctx.Request.FormFile("file")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get file from request: %v", err)
-	}
-	defer file.Close() // 确保文件流在函数结束时关闭
-
-	// 获取文件的大小和文件名
-	fileSize := header.Size
-	//fileName := header.Filename
-	// 从请求中获取其他表单字段，比如 bucket_name 和 object_name
+func (ctrl *StorageNodeController) PutObject(ctx *gin.Context) {
 	bucketName := ctx.PostForm("bucket_name")
 	objectName := ctx.PostForm("object_name")
 
-	// 验证必填字段
 	if bucketName == "" || objectName == "" {
-		return nil, errors.New("bucket_name and object_name required in parameter")
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "bucketName or objectName is empty"})
+		return
 	}
 
-	// 调用存储服务，上传文件
-	return ctrl.StorageNodeSvc.PutObject(ctx, bucketName, objectName, file, fileSize)
+	// 生成 uploadId
+	hash := md5.Sum([]byte(objectName))
+	uploadId := fmt.Sprintf("%s-%d", hex.EncodeToString(hash[:])[:8], time.Now().UnixNano())
+
+	uploadStatus := &types.UploadStatus{
+		UploadID:   uploadId,
+		IsPaused:   false,
+		IsCanceled: false,
+	}
+
+	types.UploadTasks.Lock()
+	types.UploadTasks.Tasks[uploadStatus.UploadID] = uploadStatus
+	types.UploadTasks.Unlock()
+
+	// 立即返回响应
+	ctx.JSON(http.StatusOK, gin.H{
+		"upload_id": uploadStatus.UploadID,
+		"message":   "Upload started",
+	})
+
+	// 在 goroutine 中打开和处理文件
+	go func() {
+		err := ctx.Request.ParseMultipartForm(32 << 20) // 32MB buffer
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// 获取文件头信息
+		header, err := ctx.FormFile("file")
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		file, err := header.Open()
+		if err != nil {
+			types.UploadTasks.Lock()
+			if task, ok := types.UploadTasks.Tasks[uploadStatus.UploadID]; ok {
+				task.Error = err
+			}
+			types.UploadTasks.Unlock()
+			return
+		}
+		defer file.Close()
+
+		_, err = ctrl.StorageNodeSvc.PutObject(ctx, bucketName, objectName, file, header.Size, uploadStatus.UploadID)
+		if err != nil {
+			types.UploadTasks.Lock()
+			if task, ok := types.UploadTasks.Tasks[uploadStatus.UploadID]; ok {
+				task.Error = err
+			}
+			types.UploadTasks.Unlock()
+		}
+	}()
 }
 
 // GetObject 下载分文

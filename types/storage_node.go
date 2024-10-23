@@ -1,6 +1,18 @@
 package types
 
-import "time"
+import (
+	"github.com/minio/minio-go/v7"
+	"sync"
+	"time"
+)
+
+var UploadTasks = struct {
+	sync.RWMutex
+	Tasks map[string]*UploadStatus
+	err   error
+}{
+	Tasks: make(map[string]*UploadStatus),
+}
 
 type PartInfo struct {
 	PartNumber   int       //分片的编号
@@ -21,4 +33,14 @@ type UploadReq struct {
 	BucketName string `json:"bucket_name" form:"bucket_name" `
 	ObjectName string `json:"object_name" form:"object_name" `
 	FilePath   string `json:"file_path" form:"file_path" `
+}
+
+type UploadStatus struct {
+	IsPaused       bool
+	IsCanceled     bool
+	UploadID       string
+	Mutex          sync.Mutex
+	CompletedParts []minio.CompletePart
+	CurrentPart    int
+	Error          error
 }

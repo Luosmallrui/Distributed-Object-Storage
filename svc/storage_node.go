@@ -45,9 +45,9 @@ PutObject 存储⼀个完整的对象。
   - 实现数据的冗余存储或纠删码
   - 考虑磁盘空间管理和数据均衡
 */
-func (s *StorageNodeSvc) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, fileSize int64) (*minio.UploadInfo, error) {
+func (s *StorageNodeSvc) PutObject(ctx context.Context, bucketName, objectName string, reader io.Reader, fileSize int64, UploadID string) (*minio.UploadInfo, error) {
 	client := minIo.GetMinioClient("127.0.0.1:9000")
-	return client.Upload(ctx, bucketName, objectName, reader, fileSize)
+	return client.Upload(ctx, bucketName, objectName, reader, fileSize, UploadID)
 }
 
 // 分片上传函数
